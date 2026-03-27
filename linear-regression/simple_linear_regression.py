@@ -42,18 +42,24 @@ class SimpleLinearRegression:
         It is required as without squaring errors, positive and negative errors would cancel each other out.
         """
         total_error = 0
-        for xi, yi in zip(x, y_true):
-            total_error += (yi - self.calculate_prediction(xi))**2
-        return total_error / len(y_true)  
+        if isinstance(x, list) and isinstance(y_true,list):
+            for xi, yi in zip(x, y_true):
+                total_error += (yi - self.calculate_prediction(xi))**2
+            return total_error / len(y_true)
+        else:
+            return (y_true - self.calculate_prediction(x))**2  
 
     def calculate_gradient_weight(self, x, y_true):
         """
         Calculates the gradient of the loss function with respect to the weight.
         """
         total_weight_gradient = 0
-        for xi,yi in zip(x, y_true):
-            total_weight_gradient += -xi  * (yi - (self.weight * xi) - self.bias)
-        weight_partial_derivative = (2/(len(y_true))) * total_weight_gradient
+        if isinstance(x, list) and isinstance(y_true, list):
+            for xi,yi in zip(x, y_true):
+                total_weight_gradient += -xi  * (yi - (self.weight * xi) - self.bias)
+            weight_partial_derivative = (2/(len(y_true))) * total_weight_gradient
+        else:
+            weight_partial_derivative = -2 * x * (y_true - (self.weight * x) - self.bias)
         return weight_partial_derivative
 
 
@@ -62,23 +68,52 @@ class SimpleLinearRegression:
         Calculates the gradient of the loss function with respect to the bias using partial derivative of the loss function wrt bias term (self.bias).
         """
         total_bias_gradient = 0
-        for xi,yi in zip(x, y_true):
-            total_bias_gradient += -(yi - (xi * self.weight) - self.bias )
-        bias_partial_derivative = (2/len(y_true)) * total_bias_gradient
+        if isinstance(x, list) and isinstance(y_true, list):
+            for xi,yi in zip(x, y_true):
+                total_bias_gradient += -(yi - (xi * self.weight) - self.bias )
+            bias_partial_derivative = (2/len(y_true)) * total_bias_gradient
+        else:
+            bias_partial_derivative = -2 * (y_true - (self.weight * x) - self.bias)
         return bias_partial_derivative
     
-    def fit(self, x, y_true):
+    def fit(self, x, y_true, batch_size = None):
         """Run the training loop trying to minimize the loss function by running gradient updates for the defined epochs."""
         self.loss_history = []
+        if batch_size == 0:
+            batch_size = None
+            
         for i in range(self.epochs):
-            error = self.calculate_error(x, y_true)
-            weight_grad = self.calculate_gradient_weight(x, y_true)
-            bias_grad = self.calculate_gradient_bias(x, y_true)
-            self.weight = self.weight - (self.learning_rate * weight_grad)
-            self.bias = self.bias - (self.learning_rate * bias_grad)
-            self.loss_history.append(error)
-        return self
+            if batch_size:
+                idx = list(range(len(x)))
+                random.shuffle(idx)
+                while (batch_size <= len(idx)) and (len(idx) > 0):
+                    batch_x = [x[i] for i in idx[:batch_size]]
+                    batch_y = [y_true[i] for i in idx[:batch_size]]
+                    del idx[:batch_size]
 
+                    error = self.calculate_error(batch_x, batch_y)
+                    weight_grad = self.calculate_gradient_weight(batch_x, batch_y)
+                    bias_grad = self.calculate_gradient_bias(batch_x, batch_y)
+                    self.weight = self.weight - (self.learning_rate * weight_grad)
+                    self.bias = self.bias - (self.learning_rate * bias_grad)
+                    self.loss_history.append(error)
+                
+                if len(idx) != 0:
+                    error = self.calculate_error([x[i] for i in idx], [y_true[i] for i in idx])
+                    weight_grad = self.calculate_gradient_weight([x[i] for i in idx], [y_true[i] for i in idx])
+                    bias_grad = self.calculate_gradient_bias([x[i] for i in idx], [y_true[i] for i in idx])
+                    self.weight = self.weight - (self.learning_rate * weight_grad)
+                    self.bias = self.bias - (self.learning_rate * bias_grad)
+                    self.loss_history.append(error)
+            else:
+                error = self.calculate_error(x, y_true)
+                weight_grad = self.calculate_gradient_weight(x, y_true)
+                bias_grad = self.calculate_gradient_bias(x, y_true)
+                self.weight = self.weight - (self.learning_rate * weight_grad)
+                self.bias = self.bias - (self.learning_rate * bias_grad)
+                self.loss_history.append(error)
+        return self
+    
     def predict(self, x):
         """Run predicition on overall dataset"""
         return [self.calculate_prediction(xi) for xi in x]
